@@ -1,6 +1,6 @@
-# MP3 Converter Script
+# MP3 Compress
 
-This is a Bash script that can be used to convert all mp3 files in a directory to a specified bitrate. The script uses ffmpeg's libmp3lame codec to perform the conversion.
+This Bash script converts all mp3 files in a directory to a specified bitrate. The script uses ffmpeg's libmp3lame codec to perform the conversion.
 
 ## Usage
 
