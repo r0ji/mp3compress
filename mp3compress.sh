@@ -1,27 +1,56 @@
 #!/bin/bash
 
+# =============================================================================
+# Script Name: audio-converter.sh
+# Description: This is a bash script to convert audio files to mp3 with a specified 
+#              bitrate. It processes files that are in the directory, but not in 
+#              further directories therein, overwriting existing audio files with the new version.
+# Usage: ./audio-converter.sh [options] <directory>
+# Options: -r <bitrate>   Specify the desired bitrate (default: 192k)
+#          -h             Display help information
+#          -mono          Output files as mono
+# Examples: ./audio-converter.sh -r 256 -mono ~/Music
+# =============================================================================
+
 # Default bitrate is 192 kbps
 bitrate=192k
 
+# Default audio channels is stereo
+audio_channels=2
+
 # Parse command line options
-while getopts "r:" opt; do
-  case $opt in
-    r)
-      bitrate="$OPTARG"k
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -r)
+      bitrate="$2"k
+      shift 2
       ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
+    -h)
+      echo "Usage: ./audio-converter.sh [options] <directory>"
+      echo "Options:"
+      echo "-r <bitrate>   Specify the desired bitrate (default: 192k)"
+      echo "-h             Display this help information"
+      echo "-mono          Output files as mono"
+      exit 0
       ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
+    -mono)
+      audio_channels=1
+      shift
+      ;;
+    *)
+      if [[ -z "$directory" ]]; then
+        directory="$1"
+      else
+        echo "Invalid option: $1" >&2
+        exit 1
+      fi
+      shift
       ;;
   esac
 done
 
 # Display a warning message
-read -p "WARNING: This will recursively overwrite all mp3 files in this directory with the $bitrate version. Continue? y/n " choice
+read -p "WARNING: This will overwrite all audio files in this directory with the mp3 $bitrate version. Continue? y/n " choice
 
 if [ "$choice" != "y" ]; then
   echo "Aborted."
@@ -29,15 +58,36 @@ if [ "$choice" != "y" ]; then
 fi
 
 # Check if the directory is provided as an argument
-if [ -z "$1" ]; then
+if [ -z "$directory" ]; then
   # If no directory is specified, use the current directory
   directory="."
-else
-  # Use the specified directory
-  directory="$1"
 fi
 
-# Find and convert mp3 files
-find "$directory" -type f -iname "*.mp3" -exec sh -c 'ffmpeg -i "$1" -vn -codec:a libmp3lame -b:a '"$bitrate"' -y "${1%.mp3}.tmp.mp3" && mv "${1%.mp3}.tmp.mp3" "$1" && echo "Processed: $1"' _ {} \;
+# Supported audio formats
+formats=("mp3" "wav" "flac" "m4a" "wma" "ogg" "aac" "mka")
 
-echo "All mp3 files have been converted to $bitrate." 
+# Convert audio files
+fileFound=false
+for format in "${formats[@]}"; do
+  up_format=$(echo "$format" | tr '[:lower:]' '[:upper:]')
+  lower_format=$(echo "$format" | tr '[:upper:]' '[:lower:]')
+  for file in "$directory"/*.{${lower_format},${up_format}}
+  do
+    if [ -f "$file" ]; then
+      ffmpeg -nostdin -i "$file" -vn -codec:a libmp3lame -b:a "$bitrate" -ac "$audio_channels" -y "${file%.*}.tmp.mp3" 
+      if [ $? -eq 0 ]; then
+        mv "${file%.*}.tmp.mp3" "${file%.*}.mp3"
+        echo "Processed: $file"
+        fileFound=true
+      else
+        echo "Failed to process: $file"
+      fi
+    fi
+  done
+done
+
+if [ "$fileFound" = false ]; then
+  echo "No audio files found."
+else
+  echo "All audio files have been converted to mp3 with bitrate $bitrate."
+fi
